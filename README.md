@@ -18,3 +18,5 @@ docker compose up -d
 ```bash
 docker exec -it postgis psql -U postgres
 ```
+
+4.
