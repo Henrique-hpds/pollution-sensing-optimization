@@ -21,6 +21,29 @@ from geopy.distance import geodesic
 #     e: (lat, lon)
 # }
 
+areas = {
+    row["CD_SETOR"]: {
+        "coord": (row["latitude"], row["longitude"]),
+        "pop": row["pop"],
+        "saude": row["saude"],      # calcular ainda
+        "ipvs": row["C_IPVS"],
+        # "exposicao": row["exposicao"]  # calcular ainda
+    }
+    for _, row in ipvs.iterrows()
+}
+
+# candidates (UBSs)
+candidates = {
+    row["CO_CNES"]: (float(row["NU_LATITUDE"]), float(row["NU_LONGITUDE"]))
+    for _, row in ubs.iterrows()
+}
+
+# existing (estações CETESB)
+existing = {
+    row["Nome"]: (row["LATITUDE"], row["LONGITUDE"])
+    for _, row in cetesb.iterrows()
+}
+
 #dados de entrada vindos do banco
 
 I = list(areas.keys())
@@ -41,8 +64,8 @@ for i in areas:
     w[i] = (
         alpha * data["pop"] +
         beta * data["saude"] +
-        gamma * data["ipvs"] +
-        delta * data["exposicao"]
+        gamma * data["ipvs"] 
+        # delta * data["exposicao"]
     )
 
 #cobertura existente (c_i)
