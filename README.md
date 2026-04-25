@@ -1,22 +1,6 @@
 # pollution-sensing-optimization
 
-## PostGIS via docker
+Antes de commitar, use para o commit ir para você:
 
-1. Instalar o Docker
-
-Se ainda não tiver, instale o docker.
-
-
-2. Baixar a imagem do via docker-compose (na raiz do repositório)
-
-```bash
-docker compose up -d
-```
-
-3. Acessar o terminal do PostGIS
-
-```bash
-docker exec -it postgis psql -U postgres
-```
-
-4.
+git config user.name "Nome"
+git config user.email "Email do github"
