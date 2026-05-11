@@ -114,3 +114,7 @@ webencodings==0.5.1
 websocket-client==1.9.0
 widgetsnbextension==4.0.15
 pyarrow==24.0.0
+streamlit
+streamlit-folium
+folium
+branca
