@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+CLAUDE.md
 
 # PyInstaller
 #   Usually these files are written by a python script from a template
@@ -219,3 +220,4 @@ tmp/
 
 raw_data/
 processed_data/
+results/
