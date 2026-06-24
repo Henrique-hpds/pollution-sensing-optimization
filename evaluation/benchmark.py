@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import sys
 import json
 import time
 import uuid
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from algorithms.base import ProblemData, SolveResult
@@ -40,19 +40,22 @@ def _config_hash(config: dict) -> str:
     return hashlib.sha256(blob).hexdigest()
 
 
-def run(
-    data: ProblemData,
-    config: dict,
-    results_dir: Path | None = None,
-) -> pd.DataFrame:
+def run(data: ProblemData, config: dict, results_dir: Path | None = None) -> pd.DataFrame:
     """
-    Execute all methods × p combinations specified in config. Returns a long-format
-    DataFrame (one row per run × metric) and writes results to disk.
+    Execute all methods × p combinations × random_seeds specified in config.
+    Returns a long-format DataFrame (one row per run × metric) and writes results
+    to disk.
+
+    Every method is run len(random_seeds) times for each p value. For
+    deterministic methods this captures empirical std across runs; for the
+    stochastic `random` baseline this captures the seed-to-seed distribution.
+    The `seed` kwarg is forwarded to every solver; solvers that ignore it
+    simply run with the same arguments N times.
 
     Expected config keys:
       p_values: list[int]
       methods: list[str]
-      random_seeds: list[int]
+      random_seeds: list[int]   # number of seeds = number of runs per (method, p)
       timeout_s: int
       run_spatial_cv: bool
     """
@@ -75,14 +78,14 @@ def run(
 
         p_iter = [0] if method_name == "cetesb_only" else p_values
 
+        # grid de número de sensores (p)
         for p in p_iter:
-            seed_iter = random_seeds if method_name == "random" else [None]
+            seed_iter = random_seeds
 
             for seed in seed_iter:
                 run_id = str(uuid.uuid4())
                 kw: dict = {}
-                if seed is not None:
-                    kw["seed"] = seed
+                kw["seed"] = seed
                 if method_name == "mclp":
                     kw["timeout_s"] = timeout_s
 
@@ -110,7 +113,6 @@ def run(
     df.to_parquet(out_dir / "runs.parquet", index=False)
 
     # Write meta
-    import sys
     meta = {
         "dataset_hash": data.dataset_hash,
         "config_hash": cfg_hash,

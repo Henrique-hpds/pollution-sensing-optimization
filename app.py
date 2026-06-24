@@ -363,7 +363,7 @@ with tab1:
 
     with col_param:
         st.subheader("Parâmetros")
-        P = st.slider("P (nº sensores)", 1, 50, 10)
+        P = st.slider("P (nº sensores)", 1, 100, 10)
         alpha = st.slider("α — peso população", 0.0, 2.0, 1.0, 0.05)
         beta = st.slider("β — peso saúde", 0.0, 2.0, 1.0, 0.05)
         gamma = st.slider("γ — peso IPVS", 0.0, 2.0, 1.0, 0.05)

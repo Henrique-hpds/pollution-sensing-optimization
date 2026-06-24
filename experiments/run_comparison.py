@@ -20,25 +20,18 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from evaluation.benchmark import run as run_benchmark
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Compare sensor-placement methods.")
-    p.add_argument("--config", default=str(ROOT / "experiments/configs/default.yaml"),
-                   help="Path to YAML config file.")
-    p.add_argument("--p", nargs="+", type=int, default=None,
-                   help="Override p_values from config.")
-    p.add_argument("--methods", nargs="+", default=None,
-                   help="Override methods list from config.")
-    p.add_argument("--radius", type=float, default=None,
-                   help="Override radius_km from config.")
-    p.add_argument("--figures-only", action="store_true",
-                   help="Skip benchmark; regenerate figures from an existing runs.parquet.")
-    p.add_argument("--runs", default=None,
-                   help="Path to existing runs.parquet (used with --figures-only).")
-    p.add_argument("--no-figures", action="store_true",
-                   help="Skip figure generation after benchmark.")
-    p.add_argument("--spatial-cv", action="store_true",
-                   help="Run leave-one-district-out spatial CV for all methods.")
+    p.add_argument("--config", default=str(ROOT / "experiments/configs/default.yaml"), help="Path to YAML config file.")
+    p.add_argument("--p", nargs="+", type=int, default=None, help="Override p_values from config.")
+    p.add_argument("--methods", nargs="+", default=None, help="Override methods list from config.")
+    p.add_argument("--radius", type=float, default=None, help="Override radius_km from config.")
+    p.add_argument("--figures-only", action="store_true", help="Skip benchmark; regenerate figures from an existing runs.parquet.")
+    p.add_argument("--runs", default=None, help="Path to existing runs.parquet (used with --figures-only).")
+    p.add_argument("--no-figures", action="store_true", help="Skip figure generation after benchmark.")
+    p.add_argument("--spatial-cv", action="store_true", help="Run leave-one-district-out spatial CV for all methods.")
     return p.parse_args()
 
 
@@ -70,10 +63,8 @@ def main() -> None:
     # --- load data ---
     print("[run_comparison] loading data …")
     from evaluation.data_loader import load as load_data
-    data = load_data(
-        radius_km=config.get("radius_km", 2.0),
-        weights=config.get("weights"),
-    )
+    data = load_data(radius_km=config.get("radius_km", 2.0), weights=config.get("weights"))
+    
     print(
         f"[run_comparison] {len(data.areas)} sectors, "
         f"{len(data.candidates)} UBSs, "
@@ -81,7 +72,6 @@ def main() -> None:
     )
 
     # --- benchmark ---
-    from evaluation.benchmark import run as run_benchmark
     df = run_benchmark(data, config)
 
     # Identify the latest results directory

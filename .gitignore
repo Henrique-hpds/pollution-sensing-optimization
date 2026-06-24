@@ -222,3 +222,4 @@ raw_data/
 processed_data/
 results/
 cache/
+tmp/

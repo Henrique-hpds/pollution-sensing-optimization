@@ -70,21 +70,32 @@ def fig_metric_table(df: pd.DataFrame, p: int, out_path: Path) -> None:
 
 
 def fig_metric_vs_p(df: pd.DataFrame, metric: str, out_path: Path) -> None:
-    """Line plot: metric vs p, one curve per method (excluding random)."""
+    """Line plot: metric vs p, one curve per method. Band = ±1 std across runs."""
     sub = df[df["metric"] == metric]
-    agg = sub.groupby(["method", "p"])["value"].mean().reset_index()
+    agg_mean = sub.groupby(["method", "p"])["value"].mean().reset_index()
+    agg_std = sub.groupby(["method", "p"])["value"].std().reset_index().rename(
+        columns={"value": "std"}
+    )
+    agg = agg_mean.merge(agg_std, on=["method", "p"], how="left")
+    agg["std"] = agg["std"].fillna(0.0)
 
     fig, ax = plt.subplots(figsize=(7, 4))
     for method in _METHOD_ORDER:
-        row = agg[agg["method"] == method]
+        row = agg[agg["method"] == method].sort_values("p")
         if row.empty:
             continue
         style = "--" if method in _BASELINE_METHODS else "-"
         ax.plot(row["p"], row["value"], marker="o", linestyle=style, label=method)
+        ax.fill_between(
+            row["p"],
+            row["value"] - row["std"],
+            row["value"] + row["std"],
+            alpha=0.15,
+        )
 
     ax.set_xlabel("p (número de sensores)")
     ax.set_ylabel(metric)
-    ax.set_title(f"{metric} × p")
+    ax.set_title(f"{metric} × p  (banda = ±1 std entre runs)")
     ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()
     fig.savefig(out_path, dpi=130)
