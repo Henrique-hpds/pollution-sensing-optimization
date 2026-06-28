@@ -18,6 +18,12 @@ methods:
   - greedy
   - random
   - cetesb_only
+  - grasp
+  - simulated_annealing
+  - tabu_search
+  - genetic_algorithm
+  - nsga2
+  - pso
 
 # 30 seeds for the random baseline
 random_seeds: [42, 43, 44, 45, 46, 47, 48, 49, 50, 51,

@@ -15,6 +15,14 @@ import pandas as pd
 from algorithms.base import ProblemData, SolveResult
 from algorithms.baselines import CetEsbOnlySolver, GreedyCoverageSolver, RandomSolver
 from algorithms.mclp import MCLPSolver
+from algorithms.metaheuristics import (
+    GeneticAlgorithmSolver,
+    GRASPSolver,
+    NSGA2Solver,
+    PSOSolver,
+    SimulatedAnnealingSolver,
+    TabuSearchSolver,
+)
 from algorithms.multicriteria import AHPSolver, TOPSISSolver, WLCSolver
 from algorithms.p_center import PCenterSolver
 from algorithms.p_median import PMedianSolver
@@ -32,6 +40,25 @@ _ALL_SOLVERS: dict[str, Any] = {
     "greedy": GreedyCoverageSolver(),
     "random": RandomSolver(),
     "cetesb_only": CetEsbOnlySolver(),
+    "grasp": GRASPSolver(),
+    "simulated_annealing": SimulatedAnnealingSolver(),
+    "tabu_search": TabuSearchSolver(),
+    "genetic_algorithm": GeneticAlgorithmSolver(),
+    "nsga2": NSGA2Solver(),
+    "pso": PSOSolver(),
+}
+
+# Solvers that produce identical output given the same input (no RNG used).
+_DETERMINISTIC_METHODS: set[str] = {
+    "mclp",
+    "p_median",
+    "p_center",
+    "wlc",
+    "topsis",
+    "ahp",
+    "greedy",
+    "cetesb_only",
+    "tabu_search",
 }
 
 
@@ -46,16 +73,15 @@ def run(data: ProblemData, config: dict, results_dir: Path | None = None) -> pd.
     Returns a long-format DataFrame (one row per run × metric) and writes results
     to disk.
 
-    Every method is run len(random_seeds) times for each p value. For
-    deterministic methods this captures empirical std across runs; for the
-    stochastic `random` baseline this captures the seed-to-seed distribution.
-    The `seed` kwarg is forwarded to every solver; solvers that ignore it
-    simply run with the same arguments N times.
+    Deterministic methods (mclp, p_median, p_center, wlc, topsis, ahp, greedy,
+    cetesb_only, tabu_search) run only once per p value. Stochastic methods
+    (random, grasp, simulated_annealing, genetic_algorithm, nsga2, pso) run
+    len(random_seeds) times to capture seed-to-seed variability.
 
     Expected config keys:
       p_values: list[int]
       methods: list[str]
-      random_seeds: list[int]   # number of seeds = number of runs per (method, p)
+      random_seeds: list[int]   # seeds for stochastic methods
       timeout_s: int
       run_spatial_cv: bool
     """
@@ -81,6 +107,10 @@ def run(data: ProblemData, config: dict, results_dir: Path | None = None) -> pd.
         # grid de número de sensores (p)
         for p in p_iter:
             seed_iter = random_seeds
+
+            # Deterministic methods only need 1 run (same result every time).
+            if method_name in _DETERMINISTIC_METHODS:
+                seed_iter = random_seeds[:1]
 
             for seed in seed_iter:
                 run_id = str(uuid.uuid4())
