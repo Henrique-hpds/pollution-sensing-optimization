@@ -98,9 +98,7 @@ def main() -> None:
                 cv_df = run_spatial_cv(solver, data, p, **kw)
                 cv_rows.append(cv_df)
         if cv_rows:
-            pd.concat(cv_rows, ignore_index=True).to_parquet(
-                latest / "spatial_cv.parquet", index=False
-            )
+            pd.concat(cv_rows, ignore_index=True).to_parquet(latest / "spatial_cv.parquet", index=False)
             print(f"[run_comparison] spatial CV → {latest / 'spatial_cv.parquet'}")
 
     # --- figures ---

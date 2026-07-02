@@ -12,7 +12,26 @@ import pandas as pd
 
 
 _BASELINE_METHODS = {"random", "cetesb_only"}
-_METHOD_ORDER = ["cetesb_only", "random", "greedy", "wlc", "ahp", "topsis", "p_median", "p_center", "mclp"]
+_METHOD_ORDER = ["cetesb_only", "random", "greedy", "grasp", "simulated_annealing", "tabu_search", "genetic_algorithm", "nsga2", "pso", "wlc", "ahp", "topsis", "p_median", "p_center", "mclp"]
+
+# Palette with 15 distinct colours (one per method, no repeats)
+_METHOD_COLORS = {
+    "cetesb_only":         "#E00F0F",  # red
+    "random":              "#A0A0A0",  # light grey
+    "greedy":              "#1F77B4",  # tab10 blue
+    "grasp":               "#CF680D",  # tab10 orange
+    "simulated_annealing": "#228D22",  # tab10 green
+    # "tabu_search":         "#D62728",  # tab10 red
+    "genetic_algorithm":   "#9467BD",  # tab10 purple
+    "nsga2":               "#8C564B",  # tab10 brown
+    "pso":                 "#E377C2",  # tab10 pink
+    "wlc":                 "#BCBD22",  # tab10 olive
+    "ahp":                 "#17BECF",  # tab10 cyan
+    "topsis":              "#AEC7E8",  # tab20 light blue
+    "p_median":            "#FFB061",  # tab20 light orange
+    "p_center":            "#8AE478",  # tab20 light green
+    "mclp":                "#FD8C8A",  # tab20 light red
+}
 
 
 def _pivot(df: pd.DataFrame, metric: str, p: int | None = None) -> pd.DataFrame:
@@ -73,31 +92,31 @@ def fig_metric_vs_p(df: pd.DataFrame, metric: str, out_path: Path) -> None:
     """Line plot: metric vs p, one curve per method. Band = ±1 std across runs."""
     sub = df[df["metric"] == metric]
     agg_mean = sub.groupby(["method", "p"])["value"].mean().reset_index()
-    agg_std = sub.groupby(["method", "p"])["value"].std().reset_index().rename(
-        columns={"value": "std"}
-    )
+    agg_std = sub.groupby(["method", "p"])["value"].std().reset_index().rename(columns={"value": "std"})
     agg = agg_mean.merge(agg_std, on=["method", "p"], how="left")
     agg["std"] = agg["std"].fillna(0.0)
 
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(14, 8))
     for method in _METHOD_ORDER:
         row = agg[agg["method"] == method].sort_values("p")
         if row.empty:
             continue
         style = "--" if method in _BASELINE_METHODS else "-"
-        ax.plot(row["p"], row["value"], marker="o", linestyle=style, label=method)
+        ax.plot(row["p"], row["value"], marker="o", linestyle=style, label=method, color=_METHOD_COLORS.get(method), linewidth=1.5)
         ax.fill_between(
             row["p"],
             row["value"] - row["std"],
             row["value"] + row["std"],
-            alpha=0.15,
+            alpha=0.12,
+            color=_METHOD_COLORS.get(method),
         )
 
-    ax.set_xlabel("p (número de sensores)")
-    ax.set_ylabel(metric)
-    ax.set_title(f"{metric} × p  (banda = ±1 std entre runs)")
-    ax.legend(fontsize=8, ncol=2)
+    ax.set_xlabel("p (número de sensores)", fontsize=11)
+    ax.set_ylabel(metric, fontsize=11)
+    # ax.set_title(f"{metric} × p")
+    ax.legend(fontsize=8, ncol=1, loc="upper left", bbox_to_anchor=(1.02, 1))
     fig.tight_layout()
+    fig.subplots_adjust(right=0.78)
     fig.savefig(out_path, dpi=130)
     plt.close(fig)
 
@@ -111,9 +130,7 @@ def fig_radar(df: pd.DataFrame, p: int, out_path: Path) -> None:
     sub = df[(df["p"] == p) | (df["method"] == "cetesb_only")]
     sub = sub[sub["metric"].isin(key_metrics)]
     agg = sub.groupby(["method", "metric"])["value"].mean().reset_index()
-    pivot = agg.pivot(index="method", columns="metric", values="value").reindex(
-        columns=key_metrics
-    ).fillna(0)
+    pivot = agg.pivot(index="method", columns="metric", values="value").reindex(columns=key_metrics).fillna(0)
 
     methods = [m for m in _METHOD_ORDER if m in pivot.index]
     pivot = pivot.loc[methods]
@@ -136,8 +153,8 @@ def fig_radar(df: pd.DataFrame, p: int, out_path: Path) -> None:
 
     for method in methods:
         vals = norm.loc[method].tolist() + [norm.loc[method].iloc[0]]
-        ax.plot(angles, vals, label=method)
-        ax.fill(angles, vals, alpha=0.05)
+        ax.plot(angles, vals, label=method, color=_METHOD_COLORS.get(method))
+        # ax.fill(angles, vals, alpha=0.05, color=_METHOD_COLORS.get(method))
 
     ax.set_title(f"Radar  (p={p})", y=1.08)
     ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.1), fontsize=8)
@@ -159,10 +176,9 @@ def fig_random_boxplot(df: pd.DataFrame, metric: str, p: int, out_path: Path) ->
     )
 
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.boxplot(random_vals, positions=[0], widths=0.4, patch_artist=True,
-               boxprops=dict(facecolor="lightblue"))
+    ax.boxplot(random_vals, positions=[0], widths=0.4, patch_artist=True, boxprops=dict(facecolor="lightblue"))
     for i, (method, val) in enumerate(other_means.items(), start=1):
-        ax.scatter([i], [val], zorder=3, label=method)
+        ax.scatter([i], [val], zorder=3, label=method, color=_METHOD_COLORS.get(method))
 
     ax.set_xticks(range(len(other_means) + 1))
     ax.set_xticklabels(["random (box)"] + list(other_means.index), rotation=30, ha="right")
