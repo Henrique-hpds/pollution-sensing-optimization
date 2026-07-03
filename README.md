@@ -1,4 +1,4 @@
-# Otimização de Sensores de Qualidade do Ar — MLCP
+# Otimização de Sensores de Qualidade do Ar
 
 Sistema geoespacial para otimizar a instalação de sensores de qualidade do ar em Unidades Básicas de Saúde (UBSs) no município de São Paulo. Usa diferentes modelos para selecionar *P* UBSs dentre ~400 que maximizem a cobertura populacional ponderada por vulnerabilidade social (IPVS), indicadores de saúde e exposição à poluição.
 
