@@ -245,7 +245,6 @@ max_workers: null                    # Núcleos (null = todos disponíveis)
 │   ├── configs/default.yaml               #  Configuração padrão
 │   ├── figures.py                         #  Geração de figuras
 │   └── results/                           #  Resultados dos benchmarks
-├── app.py
 ├── requirements.txt
 └── README.md
 ```
