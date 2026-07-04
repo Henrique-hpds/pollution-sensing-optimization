@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from algorithms.base import ProblemData
+from algorithms.base import ProblemData, minmax_norm
 from evaluation.distance_cache import get_or_build, haversine_matrix
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -53,11 +53,6 @@ def load(
     integrated["longitude"] = _to_float(integrated["longitude"])
     integrated["POPULACAO"] = _to_float(integrated["POPULACAO"]).fillna(0)
     integrated["C_IPVS"] = _to_float(integrated["C_IPVS"]).fillna(0)
-    for col in ("saude", "exposicao"):
-        if col not in integrated.columns:
-            integrated[col] = 0.0
-        else:
-            integrated[col] = _to_float(integrated[col]).fillna(0)
     integrated = integrated.dropna(subset=["CD_SETOR", "latitude", "longitude"]).reset_index(drop=True)
 
     # --- clean ubs ---
@@ -70,11 +65,21 @@ def load(
     cetesb["LONGITUDE"] = _to_float(cetesb["LONGITUDE"])
     cetesb = cetesb.dropna(subset=["LATITUDE", "LONGITUDE"]).reset_index(drop=True)
 
+    # --- criterios normalizados [0,1] (usados SO no peso; ver algorithms/base.py) ---
+    crit_norm = {
+        "pop": minmax_norm(_to_float(integrated["POPULACAO"]).fillna(0).to_numpy()),
+        "saude": minmax_norm(_to_float(integrated["saude"]).fillna(0).to_numpy()),
+        "ipvs": minmax_norm(_to_float(integrated["C_IPVS"]).fillna(0).to_numpy()),
+        "exposicao": minmax_norm(_to_float(integrated["exposicao"]).fillna(0).to_numpy()),
+    }
+
     # --- build dicts ---
     areas: dict = {}
+    criteria: dict = {}
     area_index: dict = {}
     for idx, row in integrated.iterrows():
         cd = str(row["CD_SETOR"])
+        # valores CRUS: metricas usam pop = pessoas, mascaras usam ipvs = classe
         areas[cd] = {
             "coord": (float(row["latitude"]), float(row["longitude"])),
             "pop": float(row["POPULACAO"]),
@@ -82,6 +87,13 @@ def load(
             "ipvs": float(row["C_IPVS"]),
             "exposicao": float(row["exposicao"]),
             "cd_dist": str(row["CD_DIST"]),
+        }
+        # criterios normalizados de decisao (so o peso usa)
+        criteria[cd] = {
+            "pop": float(crit_norm["pop"][idx]),
+            "saude": float(crit_norm["saude"][idx]),
+            "ipvs": float(crit_norm["ipvs"][idx]),
+            "exposicao": float(crit_norm["exposicao"][idx]),
         }
         area_index[cd] = int(idx)
 
@@ -124,6 +136,7 @@ def load(
 
     return ProblemData(
         areas=areas,
+        criteria=criteria,
         candidates=candidates,
         existing=existing,
         distance_matrix=distance_matrix,

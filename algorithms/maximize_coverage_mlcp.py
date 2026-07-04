@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import pulp
 
+from algorithms.base import minmax_norm
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 PROCESSED_DATA_DIR = BASE_DIR / "data" / "processed_data"
 
@@ -87,6 +89,11 @@ def build_model(
     else:
         integrated["exposicao"] = _to_float(integrated["exposicao"]).fillna(0)
 
+    crit_pop = minmax_norm(_to_float(integrated["POPULACAO"]).fillna(0).to_numpy())
+    crit_saude = minmax_norm(integrated["saude"].to_numpy())
+    crit_ipvs = minmax_norm(_to_float(integrated["C_IPVS"]).fillna(0).to_numpy())
+    crit_exp = minmax_norm(integrated["exposicao"].to_numpy())
+
     areas = {
         row["CD_SETOR"]: {
             "coord": (row["latitude"], row["longitude"]),
@@ -96,6 +103,17 @@ def build_model(
             "exposicao": row["exposicao"],
         }
         for _, row in integrated.iterrows()
+    }
+
+    # criterios normalizados [0,1] -> usados SO no peso (mesma convencao do data_loader)
+    criteria = {
+        cd: {
+            "pop": float(crit_pop[k]),
+            "saude": float(crit_saude[k]),
+            "ipvs": float(crit_ipvs[k]),
+            "exposicao": float(crit_exp[k]),
+        }
+        for k, cd in enumerate(integrated["CD_SETOR"])
     }
 
     candidates = {
@@ -113,10 +131,10 @@ def build_model(
 
     w = {
         i: (
-            alpha * areas[i]["pop"]
-            + beta * areas[i]["saude"]
-            + gamma * areas[i]["ipvs"]
-            + delta * areas[i]["exposicao"]
+            alpha * criteria[i]["pop"]
+            + beta * criteria[i]["saude"]
+            + gamma * criteria[i]["ipvs"]
+            + delta * criteria[i]["exposicao"]
         )
         for i in I
     }

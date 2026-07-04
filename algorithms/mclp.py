@@ -25,13 +25,13 @@ class MCLPSolver:
         area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
         cand_ids = sorted(data.cand_index, key=data.cand_index.__getitem__)
 
-        # Area weights: α·pop + β·saude + γ·ipvs + δ·exposicao
+        # Area weights (criterios normalizados [0,1]): α·pop + β·saude + γ·ipvs + δ·exposicao
         w_vec = np.array(
             [
-                data.weights["alpha"] * data.areas[i]["pop"]
-                + data.weights["beta"] * data.areas[i]["saude"]
-                + data.weights["gamma"] * data.areas[i]["ipvs"]
-                + data.weights["delta"] * data.areas[i]["exposicao"]
+                data.weights["alpha"] * data.criteria[i]["pop"]
+                + data.weights["beta"] * data.criteria[i]["saude"]
+                + data.weights["gamma"] * data.criteria[i]["ipvs"]
+                + data.weights["delta"] * data.criteria[i]["exposicao"]
                 for i in area_ids
             ]
         )

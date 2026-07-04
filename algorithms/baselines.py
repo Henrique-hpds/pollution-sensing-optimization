@@ -61,12 +61,12 @@ class GreedyCoverageSolver:
         n_areas = len(data.area_index)
         area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
 
-        pop = np.array([data.areas[a]["pop"] for a in area_ids], dtype=np.float64)
+        # peso da otimizacao usa os criterios normalizados [0,1]
         w = (
-            data.weights["alpha"] * pop
-            + data.weights["beta"] * np.array([data.areas[a]["saude"] for a in area_ids])
-            + data.weights["gamma"] * np.array([data.areas[a]["ipvs"] for a in area_ids])
-            + data.weights["delta"] * np.array([data.areas[a]["exposicao"] for a in area_ids])
+            data.weights["alpha"] * np.array([data.criteria[a]["pop"] for a in area_ids])
+            + data.weights["beta"] * np.array([data.criteria[a]["saude"] for a in area_ids])
+            + data.weights["gamma"] * np.array([data.criteria[a]["ipvs"] for a in area_ids])
+            + data.weights["delta"] * np.array([data.criteria[a]["exposicao"] for a in area_ids])
         )
 
         # Initial coverage from CETESB

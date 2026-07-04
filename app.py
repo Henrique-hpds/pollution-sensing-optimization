@@ -71,11 +71,6 @@ def carregar_dados() -> dict:
                 integrated[col].astype(str).str.replace(",", ".", regex=False),
                 errors="coerce",
             )
-    if "saude" not in integrated.columns:
-        integrated["saude"] = 0.0
-    if "exposicao" not in integrated.columns:
-        integrated["exposicao"] = 0.0
-
     integrated = integrated.dropna(subset=["CD_SETOR", "latitude", "longitude"]).reset_index(drop=True)
 
     # parse geometria + simplifica
@@ -154,12 +149,24 @@ def resolver(params: dict) -> dict:
     }
 
 
+def _criterios_norm(setores: pd.DataFrame) -> pd.DataFrame:
+    """Critérios normalizados [0,1] (min-max) — mesma convenção do data_loader/ILP."""
+    src = {"pop": "POPULACAO", "saude": "saude", "ipvs": "C_IPVS", "exposicao": "exposicao"}
+    out = pd.DataFrame(index=setores.index)
+    for name, col in src.items():
+        s = pd.to_numeric(setores[col], errors="coerce").fillna(0.0)
+        lo, hi = s.min(), s.max()
+        out[name] = (s - lo) / (hi - lo) if hi > lo else 0.0
+    return out
+
+
 def calcular_pesos(setores: pd.DataFrame, params: dict) -> pd.Series:
+    c = _criterios_norm(setores)
     return (
-        params["alpha"] * setores["POPULACAO"].fillna(0)
-        + params["beta"] * setores.get("saude", 0).fillna(0)
-        + params["gamma"] * setores["C_IPVS"].fillna(0)
-        + params["delta"] * setores.get("exposicao", 0).fillna(0)
+        params["alpha"] * c["pop"]
+        + params["beta"] * c["saude"]
+        + params["gamma"] * c["ipvs"]
+        + params["delta"] * c["exposicao"]
     )
 
 
@@ -177,14 +184,13 @@ def calcular_metricas(resultado: dict, dados: dict) -> dict:
     ipvs_cob = setores.loc[mask_cob, "C_IPVS"].fillna(0)
     ipvs_ncob = setores.loc[~mask_cob, "C_IPVS"].fillna(0)
 
-    # decomposição da contribuição de cada termo na função objetivo
+    # decomposição da contribuição de cada termo na função objetivo (critérios normalizados)
+    _cn = _criterios_norm(setores)
     contrib = {
-        "alpha·população": float(params["alpha"] * setores.loc[mask_cob, "POPULACAO"].fillna(0).sum()),
-        "beta·saúde": float(params["beta"] * setores.loc[mask_cob, "saude"].fillna(0).sum())
-        if "saude" in setores.columns else 0.0,
-        "gamma·IPVS": float(params["gamma"] * setores.loc[mask_cob, "C_IPVS"].fillna(0).sum()),
-        "delta·exposição": float(params["delta"] * setores.loc[mask_cob, "exposicao"].fillna(0).sum())
-        if "exposicao" in setores.columns else 0.0,
+        "alpha·população": float(params["alpha"] * _cn.loc[mask_cob, "pop"].sum()),
+        "beta·saúde": float(params["beta"] * _cn.loc[mask_cob, "saude"].sum()),
+        "gamma·IPVS": float(params["gamma"] * _cn.loc[mask_cob, "ipvs"].sum()),
+        "delta·exposição": float(params["delta"] * _cn.loc[mask_cob, "exposicao"].sum()),
     }
 
     return {
@@ -232,7 +238,7 @@ def construir_mapa(resultado: dict | None, dados: dict, params: dict) -> folium.
     if len(setores_view):
         wmax = float(setores_view["w"].quantile(0.95)) or 1.0
         colormap = cm.linear.YlOrRd_09.scale(0, wmax)
-        colormap.caption = "Peso w_i (α·pop + β·saúde + γ·IPVS + δ·exp)"
+        colormap.caption = "Peso w_i normalizado (α·pop + β·saúde + γ·IPVS + δ·exp, cada critério em [0,1])"
 
         def style_setor(feat):
             cd = feat["properties"]["CD_SETOR"]
