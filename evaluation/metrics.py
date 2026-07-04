@@ -87,7 +87,7 @@ def cob_pop_pct(d_eff: np.ndarray, pop: np.ndarray, radius_km: float) -> float:
 def cob_pop_vulneravel_pct(
     d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float
 ) -> float:
-    mask_vuln = np.isin(ipvs, [4, 5])
+    mask_vuln = np.isin(ipvs, [5, 6])  # IPVS 2022: 5 (alta) + 6 (muito alta)
     if not mask_vuln.any():
         return 0.0
     return _weighted_pct(d_eff[mask_vuln] <= radius_km, pop[mask_vuln])
@@ -185,11 +185,11 @@ def gap_ipvs_alto_baixo(
             return float("nan")
         return _weighted_pct(d_eff[m] <= radius_km, pop[m])
 
-    c5 = _cov(5)
+    c6 = _cov(6)  # IPVS 2022: grupo 6 = muito alta vulnerabilidade (mais alto)
     c1 = _cov(1)
-    if np.isnan(c5) or np.isnan(c1):
+    if np.isnan(c6) or np.isnan(c1):
         return float("nan")
-    return c5 - c1
+    return c6 - c1
 
 
 def dist_media_por_classe_ipvs(

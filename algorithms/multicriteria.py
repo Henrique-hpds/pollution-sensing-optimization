@@ -28,7 +28,7 @@ def _area_weight_vector(data: ProblemData, area_ids: list) -> np.ndarray:
 def _candidate_criteria(data: ProblemData) -> tuple[np.ndarray, list]:
     """Returns (criteria_matrix, cand_ids).
 
-    Columns: [weighted_cov, vuln_cov, mean_dist_covered, ipvs5_cov_pct]
+    Columns: [weighted_cov, vuln_cov, mean_dist_covered, ipvs6_cov_pct]
     """
     R = data.radius_km
     area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
@@ -38,11 +38,13 @@ def _candidate_criteria(data: ProblemData) -> tuple[np.ndarray, list]:
     ipvs = np.array([data.areas[a]["ipvs"] for a in area_ids], dtype=np.float64)
     w = _area_weight_vector(data, area_ids)
 
-    vuln_mask = np.isin(ipvs, [4, 5])
-    ipvs5_mask = ipvs == 5
+    # IPVS 2022: grupos 5 (alta) e 6 (muito alta) = alta vulnerabilidade;
+    # grupo 6 (muito alta) engloba favelas e comunidades urbanas.
+    vuln_mask = np.isin(ipvs, [5, 6])
+    ipvs6_mask = ipvs == 6
     total_w = w.sum() + 1e-15
     total_vuln_pop = pop[vuln_mask].sum() + 1e-15
-    total_ipvs5_pop = pop[ipvs5_mask].sum() + 1e-15
+    total_ipvs6_pop = pop[ipvs6_mask].sum() + 1e-15
 
     n_cands = len(cand_ids)
     criteria = np.zeros((n_cands, 4), dtype=np.float64)
@@ -53,7 +55,7 @@ def _candidate_criteria(data: ProblemData) -> tuple[np.ndarray, list]:
         criteria[jj, 0] = w[cov_mask].sum() / total_w                           # weighted coverage
         criteria[jj, 1] = pop[vuln_mask & cov_mask].sum() / total_vuln_pop      # vulnerable coverage
         criteria[jj, 2] = -float(col[cov_mask].mean()) if cov_mask.any() else 0 # neg mean dist (higher=better)
-        criteria[jj, 3] = pop[ipvs5_mask & cov_mask].sum() / total_ipvs5_pop    # IPVS=5 coverage
+        criteria[jj, 3] = pop[ipvs6_mask & cov_mask].sum() / total_ipvs6_pop    # IPVS=6 coverage
 
     return criteria, cand_ids
 
