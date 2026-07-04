@@ -14,6 +14,7 @@ from evaluation.metrics import evaluate
 def _subset_data(data: ProblemData, keep_area_ids: set[str]) -> ProblemData:
     """Returns a new ProblemData restricted to the given area IDs."""
     new_areas = {k: v for k, v in data.areas.items() if k in keep_area_ids}
+    new_criteria = {k: v for k, v in data.criteria.items() if k in keep_area_ids}
     new_area_index = {k: i for i, k in enumerate(
         sorted(new_areas, key=lambda a: data.area_index[a])
     )}
@@ -26,6 +27,7 @@ def _subset_data(data: ProblemData, keep_area_ids: set[str]) -> ProblemData:
     return dataclasses.replace(
         data,
         areas=new_areas,
+        criteria=new_criteria,
         area_index=new_area_index,
         distance_matrix=new_dmat,
         existing_distances=new_ext,

@@ -59,14 +59,19 @@ def integrate_parquets() -> pd.DataFrame:
     ipvs_file = PROCESSED_DATA_DIR / "ipvs.parquet"
     ubs_file = PROCESSED_DATA_DIR / "ubs.parquet"
     cetesb_file = PROCESSED_DATA_DIR / "cetesb.parquet"
+    exposicao_file = PROCESSED_DATA_DIR / "exposicao.parquet"
+    saude_file = PROCESSED_DATA_DIR / "saude.parquet"
 
-    if not ipvs_file.exists() or not ubs_file.exists() or not cetesb_file.exists():
-        missing = [str(p.name) for p in [ipvs_file, ubs_file, cetesb_file] if not p.exists()]
+    required_files = [ipvs_file, ubs_file, cetesb_file, exposicao_file, saude_file]
+    if not all(p.exists() for p in required_files):
+        missing = [str(p.name) for p in required_files if not p.exists()]
         raise FileNotFoundError(f"Arquivos ausentes em {PROCESSED_DATA_DIR}: {', '.join(missing)}")
 
     ipvs = pd.read_parquet(ipvs_file).copy()
     ubs = pd.read_parquet(ubs_file).copy()
     cetesb = pd.read_parquet(cetesb_file).copy()
+    exposicao = pd.read_parquet(exposicao_file).copy()
+    saude = pd.read_parquet(saude_file)[["CD_SETOR", "internacoes_resp", "taxa_resp_por_1000"]].copy()
 
     ipvs["latitude"] = _to_float(ipvs["latitude"])
     ipvs["longitude"] = _to_float(ipvs["longitude"])
@@ -125,6 +130,21 @@ def integrate_parquets() -> pd.DataFrame:
         axis=1,
     )
 
+    integrated = integrated.merge(exposicao, on="CD_SETOR", how="left")
+    integrated = integrated.merge(saude, on="CD_SETOR", how="left")
+
+    # Colunas canonicas consumidas por evaluation/data_loader.py: quanto maior,
+    # mais prioritario o setor (mesma convencao de pop/ipvs).
+    integrated["exposicao"] = integrated["densidade_viaria_500m_km"]
+    integrated["saude"] = integrated["taxa_resp_por_1000"]
+
+    if integrated[["exposicao", "saude"]].isna().any().any():
+        raise ValueError("CD_SETOR sem correspondencia em exposicao.parquet ou saude.parquet apos o merge.")
+
+    # Obs.: a normalizacao min-max dos criterios NAO e' feita aqui — o parquet
+    # guarda valores crus. Quem normaliza sao os provedores de dados
+    # (evaluation/data_loader.py e algorithms/maximize_coverage_mlcp.py), via
+    # algorithms.base.minmax_norm, entregando os criterios prontos aos algoritmos.
     return integrated
 
 

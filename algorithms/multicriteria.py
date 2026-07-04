@@ -15,10 +15,10 @@ from algorithms.base import ProblemData, SolveResult
 def _area_weight_vector(data: ProblemData, area_ids: list) -> np.ndarray:
     return np.array(
         [
-            data.weights["alpha"] * data.areas[a]["pop"]
-            + data.weights["beta"] * data.areas[a]["saude"]
-            + data.weights["gamma"] * data.areas[a]["ipvs"]
-            + data.weights["delta"] * data.areas[a]["exposicao"]
+            data.weights["alpha"] * data.criteria[a]["pop"]
+            + data.weights["beta"] * data.criteria[a]["saude"]
+            + data.weights["gamma"] * data.criteria[a]["ipvs"]
+            + data.weights["delta"] * data.criteria[a]["exposicao"]
             for a in area_ids
         ],
         dtype=np.float64,

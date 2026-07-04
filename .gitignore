@@ -152,6 +152,8 @@ activemq-data/
 .env
 .envrc
 .venv
+.venv-datasus
+.venv*/
 env/
 venv/
 ENV/
@@ -218,8 +220,19 @@ __marimo__/
 
 tmp/
 
-raw_data/
-processed_data/
-results/
+# brutos gigantes (~4,5 GB) e saidas de analise: fora do git, ver data/README.md
+data/raw_data/
+data/results/
+experiments/results/
 cache/
 tmp/
+
+# processed_data/ é versionado de proposito: artefatos pequenos que fazem o
+# projeto rodar out-of-the-box (integrated/ipvs/exposicao/saude/... parquets).
+# Os scripts ESSENCIAIS de regeneracao ficam em data/scripts/ (versionado).
+
+# data/tests/ = area de scratch/prototipo (notebooks didaticos, geracao de
+# figuras, auditorias) — NAO versionada.
+data/tests/
+*.dbc
+*.dbf

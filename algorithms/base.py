@@ -6,9 +6,26 @@ from typing import Protocol
 import numpy as np
 
 
+def minmax_norm(x) -> np.ndarray:
+    """Min-max normalize an array to [0, 1]. Constant input -> all zeros.
+
+    Used by the data providers (data_loader.load, build_model) to turn the raw
+    criteria into comparable [0,1] values *before* handing them to the solvers.
+    The solvers never call this — they receive the criteria already normalized.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    lo, hi = np.nanmin(x), np.nanmax(x)
+    if hi <= lo:
+        return np.zeros_like(x)
+    return (x - lo) / (hi - lo)
+
+
 @dataclass(frozen=True)
 class ProblemData:
     areas: dict            # CD_SETOR -> {coord, pop, saude, ipvs, exposicao, cd_dist}
+                           # valores CRUS: pop = pessoas, ipvs = classe (metricas/mascaras)
+    criteria: dict         # CD_SETOR -> {pop, saude, ipvs, exposicao} normalizados [0,1]
+                           # criterios de decisao: usados SO no peso da otimizacao
     candidates: dict       # CO_CNES (int) -> (lat, lon)
     existing: dict         # str id -> (lat, lon)  — CETESB stations
     distance_matrix: object        # np.ndarray shape (n_areas, n_candidates) in km
