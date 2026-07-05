@@ -16,7 +16,14 @@ def _area_arrays(data: ProblemData) -> tuple[np.ndarray, np.ndarray, np.ndarray]
 
 
 def _effective_min_distances(installed: list[int], data: ProblemData) -> np.ndarray:
-    """Min distance to any sensor (installed UBSs ∪ CETESB stations) for each sector."""
+    """Min distance to any sensor (installed UBSs ∪ CETESB stations) for each sector.
+
+    Used only by distance-based metrics (dist_media_ponderada, dist_max, dist_p95,
+    gini_distancia, dist_media_por_classe_ipvs), which have no coverage radius of
+    their own. Coverage (threshold) metrics must use `_effective_covered` instead,
+    since UBS candidates and CETESB stations have different coverage radii and a
+    single distance value can't be thresholded against both at once.
+    """
     n = len(data.area_index)
 
     if installed:
@@ -33,11 +40,26 @@ def _effective_min_distances(installed: list[int], data: ProblemData) -> np.ndar
     return np.minimum(ubs_dists, cetesb_dists)
 
 
-def _cetesb_only_min_distances(data: ProblemData) -> np.ndarray:
+def _effective_covered(installed: list[int], data: ProblemData) -> np.ndarray:
+    """Boolean coverage mask: True iff the sector has an installed UBS within
+    candidate_radius_km OR a CETESB station within existing_radius_km."""
+    n = len(data.area_index)
+
+    if installed:
+        cols = [data.cand_index[j] for j in installed]
+        ubs_covered = (data.distance_matrix[:, cols] <= data.candidate_radius_km).any(axis=1)
+    else:
+        ubs_covered = np.zeros(n, dtype=bool)
+
+    return ubs_covered | _cetesb_only_covered(data)
+
+
+def _cetesb_only_covered(data: ProblemData) -> np.ndarray:
+    """Boolean coverage mask from CETESB stations alone (within existing_radius_km)."""
     n = len(data.area_index)
     if data.existing_distances.shape[1] > 0:
-        return data.existing_distances.min(axis=1).astype(np.float64)
-    return np.full(n, np.inf)
+        return (data.existing_distances <= data.existing_radius_km).any(axis=1)
+    return np.zeros(n, dtype=bool)
 
 
 def _weighted_pct(mask: np.ndarray, weights: np.ndarray) -> float:
@@ -76,34 +98,34 @@ def _gini(values: np.ndarray, weights: np.ndarray) -> float:
 # § 5.1  Coverage metrics
 # ---------------------------------------------------------------------------
 
-def cob_setores_pct(d_eff: np.ndarray, radius_km: float) -> float:
-    return float((d_eff <= radius_km).mean())
+def cob_setores_pct(covered: np.ndarray) -> float:
+    return float(covered.mean())
 
 
-def cob_pop_pct(d_eff: np.ndarray, pop: np.ndarray, radius_km: float) -> float:
-    return _weighted_pct(d_eff <= radius_km, pop)
+def cob_pop_pct(covered: np.ndarray, pop: np.ndarray) -> float:
+    return _weighted_pct(covered, pop)
 
 
-def cob_pop_vulneravel_pct(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float) -> float:
+def cob_pop_vulneravel_pct(covered: np.ndarray, pop: np.ndarray, ipvs: np.ndarray) -> float:
     mask_vuln = np.isin(ipvs, [5, 6])  # IPVS 2022: 5 (alta) + 6 (muito alta)
     if not mask_vuln.any():
         return 0.0
-    return _weighted_pct(d_eff[mask_vuln] <= radius_km, pop[mask_vuln])
+    return _weighted_pct(covered[mask_vuln], pop[mask_vuln])
 
 
-def cob_por_classe_ipvs(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float) -> dict:
+def cob_por_classe_ipvs(covered: np.ndarray, pop: np.ndarray, ipvs: np.ndarray) -> dict:
     result = {}
     for cls in range(1, 7):
         mask = ipvs == cls
         if mask.any():
-            result[cls] = _weighted_pct(d_eff[mask] <= radius_km, pop[mask])
+            result[cls] = _weighted_pct(covered[mask], pop[mask])
         else:
             result[cls] = float("nan")
     return result
 
 
-def cob_incremental_sobre_cetesb(d_eff: np.ndarray, d_cetesb: np.ndarray, pop: np.ndarray, radius_km: float) -> float:
-    return cob_pop_pct(d_eff, pop, radius_km) - cob_pop_pct(d_cetesb, pop, radius_km)
+def cob_incremental_sobre_cetesb(covered: np.ndarray, cetesb_covered: np.ndarray, pop: np.ndarray) -> float:
+    return cob_pop_pct(covered, pop) - cob_pop_pct(cetesb_covered, pop)
 
 
 # ---------------------------------------------------------------------------
@@ -136,45 +158,41 @@ def gini_distancia(d_eff: np.ndarray, pop: np.ndarray) -> float:
 # § 5.3  Efficiency metrics
 # ---------------------------------------------------------------------------
 
-def cob_redundante_pct(installed: list[int], data: ProblemData, d_eff: np.ndarray) -> float:
-    R_cand = data.candidate_radius_km
-    R_exist = data.existing_radius_km
-    covered = d_eff <= R_cand
+def cob_redundante_pct(installed: list[int], data: ProblemData, covered: np.ndarray) -> float:
     if not covered.any():
         return 0.0
 
-    # Count sensors (UBS + CETESB) covering each sector
+    # Count sensors (UBS + CETESB) covering each sector, each against its own radius
     n = len(data.area_index)
     coverage_count = np.zeros(n, dtype=int)
 
     for j in installed:
         col = data.cand_index[j]
-        coverage_count += (data.distance_matrix[:, col] <= R_cand).astype(int)
+        coverage_count += (data.distance_matrix[:, col] <= data.candidate_radius_km).astype(int)
 
     if data.existing_distances.shape[1] > 0:
-        for e in range(data.existing_distances.shape[1]):
-            coverage_count += (data.existing_distances[:, e] <= R_exist).astype(int)
+        coverage_count += (data.existing_distances <= data.existing_radius_km).sum(axis=1)
 
     redundant = covered & (coverage_count >= 2)
     return float(redundant.sum() / covered.sum())
 
 
-def cob_marginal_por_sensor(d_eff: np.ndarray, pop: np.ndarray, radius_km: float, p: int) -> float:
+def cob_marginal_por_sensor(covered: np.ndarray, pop: np.ndarray, p: int) -> float:
     if p == 0:
         return 0.0
-    return cob_pop_pct(d_eff, pop, radius_km) / p
+    return cob_pop_pct(covered, pop) / p
 
 
 # ---------------------------------------------------------------------------
 # § 5.4  Equity metrics
 # ---------------------------------------------------------------------------
 
-def gap_ipvs_alto_baixo(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float) -> float:
+def gap_ipvs_alto_baixo(covered: np.ndarray, pop: np.ndarray, ipvs: np.ndarray) -> float:
     def _cov(cls: int) -> float:
         m = ipvs == cls
         if not m.any():
             return float("nan")
-        return _weighted_pct(d_eff[m] <= radius_km, pop[m])
+        return _weighted_pct(covered[m], pop[m])
 
     c6 = _cov(6)  # IPVS 2022: grupo 6 = muito alta vulnerabilidade (mais alto)
     c1 = _cov(1)
@@ -194,7 +212,7 @@ def dist_media_por_classe_ipvs(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndar
     return result
 
 
-def desvio_cobertura_distritos(d_eff: np.ndarray, pop: np.ndarray, data: ProblemData, radius_km: float) -> float:
+def desvio_cobertura_distritos(covered: np.ndarray, pop: np.ndarray, data: ProblemData) -> float:
     area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
     districts: dict[str, list] = {}
     for idx, aid in enumerate(area_ids):
@@ -206,7 +224,7 @@ def desvio_cobertura_distritos(d_eff: np.ndarray, pop: np.ndarray, data: Problem
     covs = []
     for idxs in districts.values():
         idxs_arr = np.array(idxs)
-        covs.append(_weighted_pct(d_eff[idxs_arr] <= radius_km, pop[idxs_arr]))
+        covs.append(_weighted_pct(covered[idxs_arr], pop[idxs_arr]))
     return float(np.std(covs)) if len(covs) > 1 else 0.0
 
 
@@ -217,21 +235,21 @@ def desvio_cobertura_distritos(d_eff: np.ndarray, pop: np.ndarray, data: Problem
 def evaluate(installed: list[int], data: ProblemData) -> dict[str, float]:
     """Evaluate all metrics for a given solution. Returns flat dict metric -> float."""
     pop, ipvs, _ = _area_arrays(data)
-    R = data.candidate_radius_km
     p = len(installed)
 
     d_eff = _effective_min_distances(installed, data)
-    d_cetesb = _cetesb_only_min_distances(data)
+    covered = _effective_covered(installed, data)
+    cetesb_covered = _cetesb_only_covered(data)
 
     result: dict[str, float] = {}
 
     # Coverage
-    result["cob_setores_pct"] = cob_setores_pct(d_eff, R)
-    result["cob_pop_pct"] = cob_pop_pct(d_eff, pop, R)
-    result["cob_pop_vulneravel_pct"] = cob_pop_vulneravel_pct(d_eff, pop, ipvs, R)
-    for cls, val in cob_por_classe_ipvs(d_eff, pop, ipvs, R).items():
+    result["cob_setores_pct"] = cob_setores_pct(covered)
+    result["cob_pop_pct"] = cob_pop_pct(covered, pop)
+    result["cob_pop_vulneravel_pct"] = cob_pop_vulneravel_pct(covered, pop, ipvs)
+    for cls, val in cob_por_classe_ipvs(covered, pop, ipvs).items():
         result[f"cob_ipvs_{cls}"] = val
-    result["cob_incremental_sobre_cetesb"] = cob_incremental_sobre_cetesb(d_eff, d_cetesb, pop, R)
+    result["cob_incremental_sobre_cetesb"] = cob_incremental_sobre_cetesb(covered, cetesb_covered, pop)
 
     # Distance
     result["dist_media_ponderada"] = dist_media_ponderada(d_eff, pop)
@@ -240,13 +258,13 @@ def evaluate(installed: list[int], data: ProblemData) -> dict[str, float]:
     result["gini_distancia"] = gini_distancia(d_eff, pop)
 
     # Efficiency
-    result["cob_redundante_pct"] = cob_redundante_pct(installed, data, d_eff)
-    result["cob_marginal_por_sensor"] = cob_marginal_por_sensor(d_eff, pop, R, p)
+    result["cob_redundante_pct"] = cob_redundante_pct(installed, data, covered)
+    result["cob_marginal_por_sensor"] = cob_marginal_por_sensor(covered, pop, p)
 
     # Equity
-    result["gap_ipvs_alto_baixo"] = gap_ipvs_alto_baixo(d_eff, pop, ipvs, R)
+    result["gap_ipvs_alto_baixo"] = gap_ipvs_alto_baixo(covered, pop, ipvs)
     for cls, val in dist_media_por_classe_ipvs(d_eff, pop, ipvs).items():
         result[f"dist_media_ipvs_{cls}"] = val
-    result["desvio_cobertura_distritos"] = desvio_cobertura_distritos(d_eff, pop, data, R)
+    result["desvio_cobertura_distritos"] = desvio_cobertura_distritos(covered, pop, data)
 
     return result
