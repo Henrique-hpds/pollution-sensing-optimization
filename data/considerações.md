@@ -27,7 +27,10 @@ quebram o pipeline existente.
 
 - **IPVS sem classificação** (`C_IPVS = NaN`) é tratado como `0`.
 - **CETESB**: excluídas as estações que estão na RMSP mas fora da cidade de
-  São Paulo (Osasco, Guarulhos, etc.).
+  São Paulo (Osasco, Guarulhos, etc.). Além disso, mantidas **apenas as estações
+  automáticas** (17 na capital) — monitoramento contínuo em tempo real; as manuais
+  (amostragem periódica em laboratório) foram excluídas, pois a proposta é ampliar a
+  rede de monitoramento contínuo, então só as automáticas são cobertura comparável.
 - **UBS** (CNES): filtradas por `TP_UNIDADE = 2`, gestor municipal de SP
   (`CO_MUNICIPIO_GESTOR = 355030`), não desativadas.
 
