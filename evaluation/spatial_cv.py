@@ -34,12 +34,7 @@ def _subset_data(data: ProblemData, keep_area_ids: set[str]) -> ProblemData:
     )
 
 
-def run_spatial_cv(
-    solver: Solver,
-    data: ProblemData,
-    p: int,
-    **solver_kwargs,
-) -> pd.DataFrame:
+def run_spatial_cv(solver: Solver, data: ProblemData, p: int, **solver_kwargs) -> pd.DataFrame:
     """
     Leave-one-district-out CV. For each district d:
       1. Solve on all areas except d.

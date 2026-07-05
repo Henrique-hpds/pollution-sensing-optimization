@@ -84,18 +84,14 @@ def cob_pop_pct(d_eff: np.ndarray, pop: np.ndarray, radius_km: float) -> float:
     return _weighted_pct(d_eff <= radius_km, pop)
 
 
-def cob_pop_vulneravel_pct(
-    d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float
-) -> float:
+def cob_pop_vulneravel_pct(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float) -> float:
     mask_vuln = np.isin(ipvs, [5, 6])  # IPVS 2022: 5 (alta) + 6 (muito alta)
     if not mask_vuln.any():
         return 0.0
     return _weighted_pct(d_eff[mask_vuln] <= radius_km, pop[mask_vuln])
 
 
-def cob_por_classe_ipvs(
-    d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float
-) -> dict:
+def cob_por_classe_ipvs(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float) -> dict:
     result = {}
     for cls in range(1, 7):
         mask = ipvs == cls
@@ -106,9 +102,7 @@ def cob_por_classe_ipvs(
     return result
 
 
-def cob_incremental_sobre_cetesb(
-    d_eff: np.ndarray, d_cetesb: np.ndarray, pop: np.ndarray, radius_km: float
-) -> float:
+def cob_incremental_sobre_cetesb(d_eff: np.ndarray, d_cetesb: np.ndarray, pop: np.ndarray, radius_km: floa) -> float:
     return cob_pop_pct(d_eff, pop, radius_km) - cob_pop_pct(d_cetesb, pop, radius_km)
 
 
@@ -142,9 +136,7 @@ def gini_distancia(d_eff: np.ndarray, pop: np.ndarray) -> float:
 # § 5.3  Efficiency metrics
 # ---------------------------------------------------------------------------
 
-def cob_redundante_pct(
-    installed: list[int], data: ProblemData, d_eff: np.ndarray
-) -> float:
+def cob_redundante_pct(installed: list[int], data: ProblemData, d_eff: np.ndarray) -> float:
     R = data.radius_km
     covered = d_eff <= R
     if not covered.any():
@@ -176,9 +168,7 @@ def cob_marginal_por_sensor(d_eff: np.ndarray, pop: np.ndarray, radius_km: float
 # § 5.4  Equity metrics
 # ---------------------------------------------------------------------------
 
-def gap_ipvs_alto_baixo(
-    d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float
-) -> float:
+def gap_ipvs_alto_baixo(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, radius_km: float) -> float:
     def _cov(cls: int) -> float:
         m = ipvs == cls
         if not m.any():
@@ -192,9 +182,7 @@ def gap_ipvs_alto_baixo(
     return c6 - c1
 
 
-def dist_media_por_classe_ipvs(
-    d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray
-) -> dict:
+def dist_media_por_classe_ipvs(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray) -> dict:
     result = {}
     for cls in range(1, 7):
         mask = ipvs == cls
@@ -205,9 +193,7 @@ def dist_media_por_classe_ipvs(
     return result
 
 
-def desvio_cobertura_distritos(
-    d_eff: np.ndarray, pop: np.ndarray, data: ProblemData, radius_km: float
-) -> float:
+def desvio_cobertura_distritos(d_eff: np.ndarray, pop: np.ndarray, data: ProblemData, radius_km: float) -> float:
     area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
     districts: dict[str, list] = {}
     for idx, aid in enumerate(area_ids):

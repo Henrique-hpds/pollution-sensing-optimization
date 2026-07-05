@@ -14,7 +14,7 @@ from evaluation.distance_cache import get_or_build, haversine_matrix
 BASE_DIR = Path(__file__).resolve().parents[1]
 PROCESSED_DATA_DIR = BASE_DIR / "data" / "processed_data"
 
-_DEFAULT_WEIGHTS = {"alpha": 1.0, "beta": 0.0, "gamma": 1.0, "delta": 0.0}
+_DEFAULT_WEIGHTS = {"alpha": 1.0, "beta": 1.0, "gamma": 1.0, "delta": 1.0}
 
 
 def _parquet_hash(*paths: Path) -> str:
@@ -25,16 +25,10 @@ def _parquet_hash(*paths: Path) -> str:
 
 
 def _to_float(series: pd.Series) -> pd.Series:
-    return pd.to_numeric(
-        series.astype(str).str.replace(",", ".", regex=False), errors="coerce"
-    )
+    return pd.to_numeric(series.astype(str).str.replace(",", ".", regex=False), errors="coerce")
 
 
-def load(
-    radius_km: float = 2.0,
-    weights: dict | None = None,
-    processed_dir: Path | None = None,
-) -> ProblemData:
+def load(radius_km: float = 2.0, weights: dict | None = None, processed_dir: Path | None = None) -> ProblemData:
     w = {**_DEFAULT_WEIGHTS, **(weights or {})}
     data_dir = processed_dir or PROCESSED_DATA_DIR
 
