@@ -27,7 +27,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--config", default=str(ROOT / "experiments/configs/default.yaml"), help="Path to YAML config file.")
     p.add_argument("--p", nargs="+", type=int, default=None, help="Override p_values from config.")
     p.add_argument("--methods", nargs="+", default=None, help="Override methods list from config.")
-    p.add_argument("--radius", type=float, default=None, help="Override radius_km from config.")
+    p.add_argument("--candidate-radius", type=float, default=None, help="Override candidate_radius_km from config.")
+    p.add_argument("--existing-radius", type=float, default=None, help="Override existing_radius_km from config.")
     p.add_argument("--figures-only", action="store_true", help="Skip benchmark; regenerate figures from an existing runs.parquet.")
     p.add_argument("--runs", default=None, help="Path to existing runs.parquet (used with --figures-only).")
     p.add_argument("--no-figures", action="store_true", help="Skip figure generation after benchmark.")
@@ -45,8 +46,10 @@ def main() -> None:
         config["p_values"] = args.p
     if args.methods is not None:
         config["methods"] = args.methods
-    if args.radius is not None:
-        config["radius_km"] = args.radius
+    if args.candidate_radius is not None:
+        config["candidate_radius_km"] = args.candidate_radius
+    if args.existing_radius is not None:
+        config["existing_radius_km"] = args.existing_radius
     if args.spatial_cv:
         config["run_spatial_cv"] = True
 
@@ -63,7 +66,11 @@ def main() -> None:
     # --- load data ---
     print("[run_comparison] loading data …")
     from evaluation.data_loader import load as load_data
-    data = load_data(radius_km=config.get("radius_km", 2.0), weights=config.get("weights"))
+    data = load_data(
+        candidate_radius_km=config.get("candidate_radius_km", 2.0),
+        existing_radius_km=config.get("existing_radius_km", 3.0),
+        weights=config.get("weights"),
+    )
     
     print(
         f"[run_comparison] {len(data.areas)} sectors, "

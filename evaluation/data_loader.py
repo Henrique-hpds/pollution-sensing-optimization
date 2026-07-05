@@ -28,7 +28,7 @@ def _to_float(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series.astype(str).str.replace(",", ".", regex=False), errors="coerce")
 
 
-def load(radius_km: float = 2.0, weights: dict | None = None, processed_dir: Path | None = None) -> ProblemData:
+def load(candidate_radius_km: float = 2.0, existing_radius_km: float = 3.0, weights: dict | None = None, processed_dir: Path | None = None) -> ProblemData:
     w = {**_DEFAULT_WEIGHTS, **(weights or {})}
     data_dir = processed_dir or PROCESSED_DATA_DIR
 
@@ -135,6 +135,7 @@ def load(radius_km: float = 2.0, weights: dict | None = None, processed_dir: Pat
         cand_index=cand_index,
         existing_index=existing_index,
         weights=w,
-        radius_km=radius_km,
+        candidate_radius_km=candidate_radius_km,
+        existing_radius_km=existing_radius_km,
         dataset_hash=dataset_hash,
     )

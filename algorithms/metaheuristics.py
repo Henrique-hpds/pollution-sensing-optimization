@@ -44,29 +44,33 @@ def _precompute_masks(data: ProblemData, n_areas: int) -> tuple[np.ndarray, np.n
     """Return (cov_mask, existing_mask) for fast coverage queries.
 
     cov_mask:     (n_areas, n_cands) bool — True iff candidate j is within
-                  radius_km of area i.
-    existing_mask: (n_areas,) bool — True iff any CETESB station covers area i.
+                  candidate_radius_km of area i.
+    existing_mask: (n_areas,) bool — True iff any CETESB station covers area i
+                  within existing_radius_km.
     """
     dmat = data.distance_matrix.astype(np.float64)
-    R = data.radius_km
-    return dmat <= R, _existing_min(data, n_areas) <= R
+    R_cand = data.candidate_radius_km
+    return dmat <= R_cand, _existing_min(data, n_areas) <= data.existing_radius_km
 
 
-def _coverage_fitness(installed_idx: list[int], dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, radius_km: float) -> float:
-    """Weighted coverage achieved by *installed_idx* (plus CETESB pre-coverage)."""
+def _coverage_fitness(installed_idx: list[int], dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, candidate_radius_km: float, existing_radius_km: float) -> float:
+    """Weighted coverage achieved by *installed_idx* (plus CETESB pre-coverage).
+
+    A sector is covered if it has a CETESB station within existing_radius_km
+    OR an installed UBS within candidate_radius_km.
+    """
     if not installed_idx:
-        min_dist = existing_min.copy()
+        covered = existing_min <= existing_radius_km
     else:
         cand_min = dmat[:, installed_idx].min(axis=1)
-        min_dist = np.minimum(existing_min, cand_min)
-    covered = min_dist <= radius_km
+        covered = (existing_min <= existing_radius_km) | (cand_min <= candidate_radius_km)
     return float(w[covered].sum())
 
 
-def _greedy_construction(dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, radius_km: float, p: int, rng: np.random.Generator | None = None) -> list[int]:
+def _greedy_construction(dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, candidate_radius_km: float, existing_radius_km: float, p: int, rng: np.random.Generator | None = None) -> list[int]:
     """Deterministic greedy max-coverage construction.  Returns list of column indices."""
     n_cands = dmat.shape[1]
-    covered = existing_min <= radius_km
+    covered = existing_min <= existing_radius_km
     remaining = set(range(n_cands))
     installed: list[int] = []
 
@@ -75,11 +79,11 @@ def _greedy_construction(dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarr
             break
         best_j, best_gain = -1, -1.0
         for j in remaining:
-            new_cover = dmat[:, j] <= radius_km
+            new_cover = dmat[:, j] <= candidate_radius_km
             gain = float(w[new_cover & ~covered].sum())
             if gain > best_gain:
                 best_gain, best_j = gain, j
-        covered |= dmat[:, best_j] <= radius_km
+        covered |= dmat[:, best_j] <= candidate_radius_km
         installed.append(best_j)
         remaining.discard(best_j)
 
@@ -136,7 +140,8 @@ class GRASPSolver:
         actual_p = min(p, n_cands)
 
         w = _build_weight_vector(data, area_ids)
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
 
         # ---- pre-compute boolean coverage masks (opt 1) ----
         cov_mask, existing_mask = _precompute_masks(data, n_areas)
@@ -231,7 +236,7 @@ class GRASPSolver:
             cand_ids,
             best_fitness,
             t0,
-            {"p": p, "radius_km": R, "weights": data.weights,
+            {"p": p, "candidate_radius_km": R_cand, "existing_radius_km": R_exist, "weights": data.weights,
              "alpha": alpha, "iterations": iterations},
         )
 
@@ -270,12 +275,13 @@ class SimulatedAnnealingSolver:
         w = _build_weight_vector(data, area_ids)
         dmat = data.distance_matrix.astype(np.float64)
         existing_min = _existing_min(data, n_areas)
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
         actual_p = min(p, n_cands)
 
         # Start from random solution
         current = _random_solution(n_cands, actual_p, rng)
-        current_fit = _coverage_fitness(current, dmat, existing_min, w, R)
+        current_fit = _coverage_fitness(current, dmat, existing_min, w, R_cand, R_exist)
 
         best_installed = current[:]
         best_fitness = current_fit
@@ -291,7 +297,7 @@ class SimulatedAnnealingSolver:
 
             neighbour = current[:]
             neighbour[out_pos] = in_j
-            neighbour_fit = _coverage_fitness(neighbour, dmat, existing_min, w, R)
+            neighbour_fit = _coverage_fitness(neighbour, dmat, existing_min, w, R_cand, R_exist)
 
             delta = neighbour_fit - current_fit
             if delta > 0 or rng.random() < np.exp(delta / (T + 1e-15)):
@@ -311,7 +317,7 @@ class SimulatedAnnealingSolver:
             cand_ids,
             best_fitness,
             t0,
-            {"p": p, "radius_km": R, "weights": data.weights,
+            {"p": p, "candidate_radius_km": R_cand, "existing_radius_km": R_exist, "weights": data.weights,
              "T0": T0, "cooling_rate": cooling_rate, "max_iterations": max_iterations},
         )
 
@@ -348,12 +354,13 @@ class TabuSearchSolver:
         w = _build_weight_vector(data, area_ids)
         dmat = data.distance_matrix.astype(np.float64)
         existing_min = _existing_min(data, n_areas)
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
         actual_p = min(p, n_cands)
 
         # Initial solution: greedy
-        current = _greedy_construction(dmat, existing_min, w, R, actual_p)
-        current_fit = _coverage_fitness(current, dmat, existing_min, w, R)
+        current = _greedy_construction(dmat, existing_min, w, R_cand, R_exist, actual_p)
+        current_fit = _coverage_fitness(current, dmat, existing_min, w, R_cand, R_exist)
 
         best_installed = current[:]
         best_fitness = current_fit
@@ -404,7 +411,7 @@ class TabuSearchSolver:
             cand_ids,
             best_fitness,
             t0,
-            {"p": p, "radius_km": R, "weights": data.weights,
+            {"p": p, "candidate_radius_km": R_cand, "existing_radius_km": R_exist, "weights": data.weights,
              "tabu_tenure": tabu_tenure, "max_iterations": max_iterations},
         )
 
@@ -422,9 +429,9 @@ def _init_population(n_cands: int, p: int, pop_size: int, rng: np.random.Generat
     return pop
 
 
-def _chromosome_fitness(chromosome: np.ndarray, dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, radius_km: float) -> float:
+def _chromosome_fitness(chromosome: np.ndarray, dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, candidate_radius_km: float, existing_radius_km: float) -> float:
     installed = list(np.where(chromosome == 1)[0])
-    return _coverage_fitness(installed, dmat, existing_min, w, radius_km)
+    return _coverage_fitness(installed, dmat, existing_min, w, candidate_radius_km, existing_radius_km)
 
 
 def _tournament_select(pop: np.ndarray, fitnesses: np.ndarray, rng: np.random.Generator, tourney_size: int = 3) -> np.ndarray:
@@ -512,12 +519,13 @@ class GeneticAlgorithmSolver:
         w = _build_weight_vector(data, area_ids)
         dmat = data.distance_matrix.astype(np.float64)
         existing_min = _existing_min(data, n_areas)
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
         actual_p = min(p, n_cands)
 
         # Initialisation
         pop = _init_population(n_cands, actual_p, pop_size, rng)
-        fitnesses = np.array([_chromosome_fitness(ch, dmat, existing_min, w, R) for ch in pop])
+        fitnesses = np.array([_chromosome_fitness(ch, dmat, existing_min, w, R_cand, R_exist) for ch in pop])
 
         best_idx = int(np.argmax(fitnesses))
         best_chromosome = pop[best_idx].copy()
@@ -545,10 +553,10 @@ class GeneticAlgorithmSolver:
                 c2 = _mutate(c2, actual_p, mutation_rate, rng)
 
                 new_pop[i] = c1
-                new_fitnesses[i] = _chromosome_fitness(c1, dmat, existing_min, w, R)
+                new_fitnesses[i] = _chromosome_fitness(c1, dmat, existing_min, w, R_cand, R_exist)
                 if i + 1 < pop_size:
                     new_pop[i + 1] = c2
-                    new_fitnesses[i + 1] = _chromosome_fitness(c2, dmat, existing_min, w, R)
+                    new_fitnesses[i + 1] = _chromosome_fitness(c2, dmat, existing_min, w, R_cand, R_exist)
 
             pop = new_pop
             fitnesses = new_fitnesses
@@ -565,7 +573,7 @@ class GeneticAlgorithmSolver:
             cand_ids,
             best_fitness,
             t0,
-            {"p": p, "radius_km": R, "weights": data.weights,
+            {"p": p, "candidate_radius_km": R_cand, "existing_radius_km": R_exist, "weights": data.weights,
              "pop_size": pop_size, "generations": generations,
              "mutation_rate": mutation_rate, "crossover_rate": crossover_rate},
         )
@@ -575,14 +583,14 @@ class GeneticAlgorithmSolver:
 # 5. NSGA-II — Non-dominated Sorting Genetic Algorithm II
 # ---------------------------------------------------------------------------
 
-def _coverage_by_district(installed_idx: list[int], dmat: np.ndarray, existing_min: np.ndarray, area_ids: list, data: ProblemData, radius_km: float) -> dict:
+def _coverage_by_district(installed_idx: list[int], dmat: np.ndarray, existing_min: np.ndarray, area_ids: list, data: ProblemData, candidate_radius_km: float, existing_radius_km: float) -> dict:
     """Compute per-district population coverage rates."""
     if not installed_idx:
         cand_min = existing_min.copy()
     else:
         cand_min = dmat[:, installed_idx].min(axis=1)
         cand_min = np.minimum(existing_min, cand_min)
-    covered = cand_min <= radius_km
+    covered = (existing_min <= existing_radius_km) | (cand_min <= candidate_radius_km)
 
     districts: dict[str, dict] = {}
     for i, area_id in enumerate(area_ids):
@@ -607,9 +615,9 @@ def _gini(values: np.ndarray) -> float:
     return float((2 * np.sum(index * sorted_vals)) / (n * np.sum(sorted_vals)) - (n + 1) / n)
 
 
-def _equity_objective(installed_idx: list[int], dmat: np.ndarray, existing_min: np.ndarray, area_ids: list, data: ProblemData, radius_km: float) -> float:
+def _equity_objective(installed_idx: list[int], dmat: np.ndarray, existing_min: np.ndarray, area_ids: list, data: ProblemData, candidate_radius_km: float, existing_radius_km: float) -> float:
     """Coverage equity: 1 − Gini of per-district coverage rates."""
-    districts = _coverage_by_district(installed_idx, dmat, existing_min, area_ids, data, radius_km)
+    districts = _coverage_by_district(installed_idx, dmat, existing_min, area_ids, data, candidate_radius_km, existing_radius_km)
     rates = []
     for d in districts.values():
         if d["total_pop"] > 0:
@@ -725,11 +733,11 @@ def _knee_point(fitnesses: np.ndarray, front: np.ndarray) -> int:
     return int(front[np.argmax(distances)])
 
 
-def _evaluate_multi_objective(chromosome: np.ndarray, dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, area_ids: list, data: ProblemData, radius_km: float) -> tuple[float, float]:
+def _evaluate_multi_objective(chromosome: np.ndarray, dmat: np.ndarray, existing_min: np.ndarray, w: np.ndarray, area_ids: list, data: ProblemData, candidate_radius_km: float, existing_radius_km: float) -> tuple[float, float]:
     """Return (coverage, equity) for a chromosome."""
     installed = list(np.where(chromosome == 1)[0])
-    coverage = _coverage_fitness(installed, dmat, existing_min, w, radius_km)
-    equity = _equity_objective(installed, dmat, existing_min, area_ids, data, radius_km)
+    coverage = _coverage_fitness(installed, dmat, existing_min, w, candidate_radius_km, existing_radius_km)
+    equity = _equity_objective(installed, dmat, existing_min, area_ids, data, candidate_radius_km, existing_radius_km)
     return coverage, equity
 
 
@@ -771,7 +779,8 @@ class NSGA2Solver:
         w = _build_weight_vector(data, area_ids)
         dmat = data.distance_matrix.astype(np.float64)
         existing_min = _existing_min(data, n_areas)
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
         actual_p = min(p, n_cands)
 
         # Ensure even population
@@ -784,7 +793,7 @@ class NSGA2Solver:
         obj = np.zeros((pop_size, 2))
         for i in range(pop_size):
             obj[i, 0], obj[i, 1] = _evaluate_multi_objective(
-                pop[i], dmat, existing_min, w, area_ids, data, R
+                pop[i], dmat, existing_min, w, area_ids, data, R_cand, R_exist
             )
 
         for _ in range(generations):
@@ -818,7 +827,7 @@ class NSGA2Solver:
             off_obj = np.zeros((pop_size, 2))
             for i in range(pop_size):
                 off_obj[i, 0], off_obj[i, 1] = _evaluate_multi_objective(
-                    offspring[i], dmat, existing_min, w, area_ids, data, R
+                    offspring[i], dmat, existing_min, w, area_ids, data, R_cand, R_exist
                 )
 
             # --- merge and select next generation ---
@@ -864,7 +873,7 @@ class NSGA2Solver:
             cand_ids,
             best_coverage,
             t0,
-            {"p": p, "radius_km": R, "weights": data.weights,
+            {"p": p, "candidate_radius_km": R_cand, "existing_radius_km": R_exist, "weights": data.weights,
              "pop_size": pop_size, "generations": generations,
              "mutation_rate": mutation_rate, "crossover_rate": crossover_rate},
             status="Heuristic",
@@ -912,12 +921,13 @@ class PSOSolver:
         w_vec = _build_weight_vector(data, area_ids)
         dmat = data.distance_matrix.astype(np.float64)
         existing_min = _existing_min(data, n_areas)
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
         actual_p = min(p, n_cands)
 
         # Warm-start: initialise positions with greedy scores + noise
         # Compute a simple per-candidate score (total weight within radius)
-        cov = dmat <= R
+        cov = dmat <= R_cand
         candidate_scores = cov.T.astype(np.float64) @ w_vec
         score_norm = (candidate_scores - candidate_scores.min()) / (candidate_scores.max() - candidate_scores.min() + 1e-9)
 
@@ -936,7 +946,7 @@ class PSOSolver:
             pbest_positions[i] = positions[i].copy()
 
             top_idx = list(np.argsort(positions[i])[::-1][:actual_p])
-            pbest_fitnesses[i] = _coverage_fitness(top_idx, dmat, existing_min, w_vec, R)
+            pbest_fitnesses[i] = _coverage_fitness(top_idx, dmat, existing_min, w_vec, R_cand, R_exist)
 
         gbest_idx = int(np.argmax(pbest_fitnesses))
         gbest_position = positions[gbest_idx].copy()
@@ -960,7 +970,7 @@ class PSOSolver:
                 positions[i] = np.clip(positions[i], 0.0, 1.0)
 
                 top_idx = list(np.argsort(positions[i])[::-1][:actual_p])
-                fit = _coverage_fitness(top_idx, dmat, existing_min, w_vec, R)
+                fit = _coverage_fitness(top_idx, dmat, existing_min, w_vec, R_cand, R_exist)
 
                 if fit > pbest_fitnesses[i]:
                     pbest_fitnesses[i] = fit
@@ -972,7 +982,7 @@ class PSOSolver:
 
         # Final solution from gbest
         installed_idx = list(np.argsort(gbest_position)[::-1][:actual_p])
-        final_fitness = _coverage_fitness(installed_idx, dmat, existing_min, w_vec, R)
+        final_fitness = _coverage_fitness(installed_idx, dmat, existing_min, w_vec, R_cand, R_exist)
 
         return _build_result(
             self.name,
@@ -980,7 +990,7 @@ class PSOSolver:
             cand_ids,
             final_fitness,
             t0,
-            {"p": p, "radius_km": R, "weights": data.weights,
+            {"p": p, "candidate_radius_km": R_cand, "existing_radius_km": R_exist, "weights": data.weights,
              "n_particles": n_particles, "iterations": iterations,
              "w": w, "c1": c1, "c2": c2},
         )

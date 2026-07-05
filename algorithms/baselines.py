@@ -21,7 +21,7 @@ class CetEsbOnlySolver:
             objective=None,
             runtime_s=0.0,
             status="Baseline",
-            params={"p": 0, "radius_km": data.radius_km},
+            params={"p": 0, "candidate_radius_km": data.candidate_radius_km, "existing_radius_km": data.existing_radius_km},
         )
 
 
@@ -42,7 +42,7 @@ class RandomSolver:
             objective=None,
             runtime_s=time.perf_counter() - t0,
             status="Heuristic",
-            params={"p": p, "radius_km": data.radius_km, "seed": seed},
+            params={"p": p, "candidate_radius_km": data.candidate_radius_km, "existing_radius_km": data.existing_radius_km, "seed": seed},
         )
 
 
@@ -57,7 +57,8 @@ class GreedyCoverageSolver:
 
     def solve(self, data: ProblemData, p: int, **kwargs) -> SolveResult:
         t0 = time.perf_counter()
-        R = data.radius_km
+        R_cand = data.candidate_radius_km
+        R_exist = data.existing_radius_km
         n_areas = len(data.area_index)
         area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
 
@@ -71,7 +72,7 @@ class GreedyCoverageSolver:
 
         # Initial coverage from CETESB
         if data.existing_distances.shape[1] > 0:
-            covered = data.existing_distances.min(axis=1) <= R
+            covered = data.existing_distances.min(axis=1) <= R_exist
         else:
             covered = np.zeros(n_areas, dtype=bool)
 
@@ -84,11 +85,11 @@ class GreedyCoverageSolver:
                 break
             best_j, best_gain = -1, -1.0
             for j in remaining:
-                new_cover = data.distance_matrix[:, j] <= R
+                new_cover = data.distance_matrix[:, j] <= R_cand
                 gain = float(w[new_cover & ~covered].sum())
                 if gain > best_gain:
                     best_gain, best_j = gain, j
-            covered |= (data.distance_matrix[:, best_j] <= R)
+            covered |= (data.distance_matrix[:, best_j] <= R_cand)
             installed_idx.append(best_j)
             remaining.discard(best_j)
 
@@ -99,5 +100,5 @@ class GreedyCoverageSolver:
             objective=None,
             runtime_s=time.perf_counter() - t0,
             status="Heuristic",
-            params={"p": p, "radius_km": data.radius_km, "weights": data.weights},
+            params={"p": p, "candidate_radius_km": data.candidate_radius_km, "existing_radius_km": data.existing_radius_km, "weights": data.weights},
         )

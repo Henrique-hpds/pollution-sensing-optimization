@@ -102,7 +102,7 @@ def cob_por_classe_ipvs(d_eff: np.ndarray, pop: np.ndarray, ipvs: np.ndarray, ra
     return result
 
 
-def cob_incremental_sobre_cetesb(d_eff: np.ndarray, d_cetesb: np.ndarray, pop: np.ndarray, radius_km: floa) -> float:
+def cob_incremental_sobre_cetesb(d_eff: np.ndarray, d_cetesb: np.ndarray, pop: np.ndarray, radius_km: float) -> float:
     return cob_pop_pct(d_eff, pop, radius_km) - cob_pop_pct(d_cetesb, pop, radius_km)
 
 
@@ -137,8 +137,9 @@ def gini_distancia(d_eff: np.ndarray, pop: np.ndarray) -> float:
 # ---------------------------------------------------------------------------
 
 def cob_redundante_pct(installed: list[int], data: ProblemData, d_eff: np.ndarray) -> float:
-    R = data.radius_km
-    covered = d_eff <= R
+    R_cand = data.candidate_radius_km
+    R_exist = data.existing_radius_km
+    covered = d_eff <= R_cand
     if not covered.any():
         return 0.0
 
@@ -148,11 +149,11 @@ def cob_redundante_pct(installed: list[int], data: ProblemData, d_eff: np.ndarra
 
     for j in installed:
         col = data.cand_index[j]
-        coverage_count += (data.distance_matrix[:, col] <= R).astype(int)
+        coverage_count += (data.distance_matrix[:, col] <= R_cand).astype(int)
 
     if data.existing_distances.shape[1] > 0:
         for e in range(data.existing_distances.shape[1]):
-            coverage_count += (data.existing_distances[:, e] <= R).astype(int)
+            coverage_count += (data.existing_distances[:, e] <= R_exist).astype(int)
 
     redundant = covered & (coverage_count >= 2)
     return float(redundant.sum() / covered.sum())
@@ -216,7 +217,7 @@ def desvio_cobertura_distritos(d_eff: np.ndarray, pop: np.ndarray, data: Problem
 def evaluate(installed: list[int], data: ProblemData) -> dict[str, float]:
     """Evaluate all metrics for a given solution. Returns flat dict metric -> float."""
     pop, ipvs, _ = _area_arrays(data)
-    R = data.radius_km
+    R = data.candidate_radius_km
     p = len(installed)
 
     d_eff = _effective_min_distances(installed, data)

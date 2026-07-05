@@ -1,6 +1,7 @@
 p_values: [5, 10, 20, 50, 100]
 
-radius_km: 2.0
+candidate_radius_km: 2.0
+existing_radius_km: 3.0
 
 weights:
   alpha: 1.0   # população

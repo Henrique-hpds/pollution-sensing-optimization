@@ -30,7 +30,7 @@ def _candidate_criteria(data: ProblemData) -> tuple[np.ndarray, list]:
 
     Columns: [weighted_cov, vuln_cov, mean_dist_covered, ipvs6_cov_pct]
     """
-    R = data.radius_km
+    R = data.candidate_radius_km
     area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
     cand_ids = sorted(data.cand_index, key=data.cand_index.__getitem__)
 
@@ -70,7 +70,7 @@ class WLCSolver:
 
     def solve(self, data: ProblemData, p: int, **kwargs) -> SolveResult:
         t0 = time.perf_counter()
-        R = data.radius_km
+        R = data.candidate_radius_km
         area_ids = sorted(data.area_index, key=data.area_index.__getitem__)
         cand_ids = sorted(data.cand_index, key=data.cand_index.__getitem__)
         w = _area_weight_vector(data, area_ids)
@@ -88,7 +88,7 @@ class WLCSolver:
             objective=float(scores[top_idx].sum()),
             runtime_s=time.perf_counter() - t0,
             status="Heuristic",
-            params={"p": p, "radius_km": R, "weights": data.weights},
+            params={"p": p, "candidate_radius_km": R, "existing_radius_km": data.existing_radius_km, "weights": data.weights},
         )
 
 
@@ -131,7 +131,7 @@ class TOPSISSolver:
             objective=float(score[top_idx].sum()),
             runtime_s=time.perf_counter() - t0,
             status="Heuristic",
-            params={"p": p, "radius_km": data.radius_km, "weights": data.weights},
+            params={"p": p, "candidate_radius_km": data.candidate_radius_km, "existing_radius_km": data.existing_radius_km, "weights": data.weights},
         )
 
 
@@ -154,5 +154,5 @@ class AHPSolver:
             objective=result.objective,
             runtime_s=time.perf_counter() - t0,
             status="Heuristic",
-            params={"p": p, "radius_km": data.radius_km, "weights": data.weights},
+            params={"p": p, "candidate_radius_km": data.candidate_radius_km, "existing_radius_km": data.existing_radius_km, "weights": data.weights},
         )

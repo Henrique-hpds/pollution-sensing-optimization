@@ -36,16 +36,16 @@ class MCLPSolver:
             ]
         )
 
-        # CETESB pre-coverage: c[i] = 1 if nearest CETESB ≤ radius_km
+        # CETESB pre-coverage: c[i] = 1 if nearest CETESB ≤ existing_radius_km
         if data.existing_distances.shape[1] > 0:
-            c_vec = (data.existing_distances.min(axis=1) <= data.radius_km).astype(int)
+            c_vec = (data.existing_distances.min(axis=1) <= data.existing_radius_km).astype(int)
         else:
             c_vec = np.zeros(len(area_ids), dtype=int)
 
         # Coverage sets: for each area, which candidates cover it?
         covered_by = []
         for row_idx in range(len(area_ids)):
-            cols = np.where(data.distance_matrix[row_idx] <= data.radius_km)[0]
+            cols = np.where(data.distance_matrix[row_idx] <= data.candidate_radius_km)[0]
             covered_by.append([cand_ids[c] for c in cols])
 
         model = pulp.LpProblem("MCLP", pulp.LpMaximize)
@@ -77,7 +77,8 @@ class MCLPSolver:
             status=lp_status,
             params={
                 "p": p,
-                "radius_km": data.radius_km,
+                "candidate_radius_km": data.candidate_radius_km,
+                "existing_radius_km": data.existing_radius_km,
                 "weights": data.weights,
                 "timeout_s": timeout_s,
             },

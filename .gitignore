@@ -236,3 +236,5 @@ tmp/
 data/tests/
 *.dbc
 *.dbf
+
+relatorio/

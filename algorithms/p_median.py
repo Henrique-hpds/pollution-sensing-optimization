@@ -99,5 +99,5 @@ class PMedianSolver:
             objective=final_obj,
             runtime_s=time.perf_counter() - t0,
             status="Heuristic",
-            params={"p": p, "radius_km": data.radius_km, "weights": data.weights, "n_swaps": n_swaps},
+            params={"p": p, "candidate_radius_km": data.candidate_radius_km, "existing_radius_km": data.existing_radius_km, "weights": data.weights, "n_swaps": n_swaps},
         )

@@ -34,7 +34,8 @@ class ProblemData:
     cand_index: dict       # CO_CNES (int) -> col index
     existing_index: dict   # str id -> col index (for existing_distances)
     weights: dict          # {"alpha", "beta", "gamma", "delta"}
-    radius_km: float
+    candidate_radius_km: float
+    existing_radius_km: float
     dataset_hash: str      # sha256 of input parquets
 
 
