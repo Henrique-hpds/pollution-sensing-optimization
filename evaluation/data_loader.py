@@ -115,16 +115,12 @@ def load(radius_km: float = 2.0, weights: dict | None = None, processed_dir: Pat
     cand_lats = np.array([candidates[j][0] for j in cand_ids], dtype=np.float64)
     cand_lons = np.array([candidates[j][1] for j in cand_ids], dtype=np.float64)
 
-    distance_matrix = get_or_build(
-        dataset_hash, area_lats, area_lons, cand_lats, cand_lons
-    )
+    distance_matrix = get_or_build(dataset_hash, area_lats, area_lons, cand_lats, cand_lons)
 
     if exist_ids:
         ext_lats = np.array([existing[e][0] for e in exist_ids], dtype=np.float64)
         ext_lons = np.array([existing[e][1] for e in exist_ids], dtype=np.float64)
-        existing_distances = haversine_matrix(
-            area_lats, area_lons, ext_lats, ext_lons
-        ).astype(np.float32)
+        existing_distances = haversine_matrix(area_lats, area_lons, ext_lats, ext_lons).astype(np.float32)
     else:
         existing_distances = np.empty((len(area_ids), 0), dtype=np.float32)
 

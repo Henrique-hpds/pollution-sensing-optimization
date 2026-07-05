@@ -110,13 +110,25 @@ def fig_metric_vs_p(df: pd.DataFrame, metric: str, out_path: Path) -> None:
             alpha=0.12,
             color=_METHOD_COLORS.get(method),
         )
+        
+    labels_y = {
+        "cob_pop_pct": "Cobertura populacional (%)",
+        "cob_pop_vulneravel_pct": "Cobertura populacional vulnerável (%)",
+        "dist_media_ponderada": "Distância média ponderada (km)",
+        "gini_distancia": "Índice de Gini da distância",}
 
-    ax.set_xlabel("p (número de sensores)", fontsize=11)
-    ax.set_ylabel(metric, fontsize=11)
+    ax.set_xlabel("p (número de sensores adicionados)", fontsize=13)
+    ax.set_ylabel(labels_y[metric], fontsize=13)
     # ax.set_title(f"{metric} × p")
-    ax.legend(fontsize=8, ncol=1, loc="upper left", bbox_to_anchor=(1.02, 1))
+    
+    plt.tick_params(labelsize=13)
+    
+    if metric == "dist_media_ponderada":
+        ax.legend(fontsize=13, ncol=2, loc="upper right")
+    else:
+        ax.legend(fontsize=13, ncol=2, loc="upper left")
     fig.tight_layout()
-    fig.subplots_adjust(right=0.78)
+    # fig.subplots_adjust(right=0.78)
     fig.savefig(out_path, dpi=130)
     plt.close(fig)
 

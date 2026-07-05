@@ -155,7 +155,11 @@ def _build_tasks(method_names: list[str], p_values: list[int], random_seeds: lis
         p_iter = [0] if method_name == "cetesb_only" else p_values
 
         for p in p_iter:
-            seed_iter = (random_seeds[:1] if method_name in _DETERMINISTIC_METHODS else random_seeds)
+            # Usar esse se só quiser rodar várias sementes para métodos estocásticos, e apenas uma para determinísticos
+            # seed_iter = (random_seeds[:1] if method_name in _DETERMINISTIC_METHODS else random_seeds)
+            
+            # Usar esse se quiser rodar várias sementes para todos os métodos, mesmo os determinísticos
+            seed_iter = random_seeds 
             for seed in seed_iter:
                 tasks.append((method_name, p, seed, config_hash, timeout_s))
 
